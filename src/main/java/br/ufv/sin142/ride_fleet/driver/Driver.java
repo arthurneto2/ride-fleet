@@ -1,5 +1,6 @@
 package br.ufv.sin142.ride_fleet.driver;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.UUID;
@@ -11,7 +12,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString
+@ToString(exclude = "password")
 public class Driver {
 
     @Id
@@ -23,6 +24,13 @@ public class Driver {
 
     @Column(name = "vehicle_plate", nullable = false, unique = true)
     private String vehiclePlate;
+
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column(nullable = false)
+    @JsonIgnore
+    private String password;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

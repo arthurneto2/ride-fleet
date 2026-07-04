@@ -53,13 +53,99 @@ graph TD
 
 ## 3. Especificação da API REST (Endpoints)
 
-Abaixo estão definidos os contratos preliminares dos endpoints HTTP que o serviço cliente deve expor e consumir.
+Abaixo estão definidos os contratos dos endpoints HTTP que o serviço cliente expõe e consome.
 
-### 3.1. Endpoints para o Front-end / Clientes do Aplicativo
+### 3.1. Endpoints de Autenticação e Segurança (Públicos)
+
+#### Registrar Passageiro
+* **Rota:** `POST /api/v1/auth/passenger/register`
+* **Descrição:** Cadastra um novo passageiro no sistema. A senha é armazenada criptografada com hash BCrypt.
+* **Payload de Entrada:**
+```json
+{
+  "name": "João da Silva",
+  "email": "joao@exemplo.com",
+  "phone": "(31) 99999-9999",
+  "password": "senhaSegura123"
+}
+```
+* **Respostas:**
+  * `201 Created` (Passageiro criado com sucesso).
+  * `400 Bad Request` (Email já cadastrado ou dados inválidos).
+
+#### Registrar Motorista
+* **Rota:** `POST /api/v1/auth/driver/register`
+* **Descrição:** Cadastra um novo motorista no sistema. Status inicial é definido como `OFFLINE`.
+* **Payload de Entrada:**
+```json
+{
+  "name": "Maria Souza",
+  "vehiclePlate": "ABC-1234",
+  "email": "maria@exemplo.com",
+  "password": "senhaSegura456"
+}
+```
+* **Respostas:**
+  * `201 Created` (Motorista criado com sucesso).
+  * `400 Bad Request` (Email/placa já cadastrados ou dados inválidos).
+
+#### Login de Passageiro
+* **Rota:** `POST /api/v1/auth/passenger/login`
+* **Descrição:** Autentica um passageiro e retorna um token de acesso JWT válido por 24 horas.
+* **Payload de Entrada:**
+```json
+{
+  "email": "joao@exemplo.com",
+  "password": "senhaSegura123"
+}
+```
+* **Respostas:**
+  * `200 OK` (Autenticado com sucesso, retorna o token JWT).
+  * `401 Unauthorized` (Credenciais inválidas).
+* **Payload de Saída:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "role": "ROLE_PASSENGER",
+  "id": "uuid-passageiro",
+  "name": "João da Silva"
+}
+```
+
+#### Login de Motorista
+* **Rota:** `POST /api/v1/auth/driver/login`
+* **Descrição:** Autentica um motorista e retorna um token de acesso JWT válido por 12 horas.
+* **Payload de Entrada:**
+```json
+{
+  "email": "maria@exemplo.com",
+  "password": "senhaSegura456"
+}
+```
+* **Respostas:**
+  * `200 OK` (Autenticado com sucesso, retorna o token JWT).
+  * `401 Unauthorized` (Credenciais inválidas).
+* **Payload de Saída:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "role": "ROLE_DRIVER",
+  "id": "uuid-motorista",
+  "name": "Maria Souza"
+}
+```
+
+---
+
+### 3.2. Endpoints para o Front-end / Clientes (Protegidos por JWT)
+
+> [!NOTE]
+> Todos os endpoints desta seção exigem o envio do token JWT obtido no login no cabeçalho HTTP:
+> `Authorization: Bearer <token>`
 
 #### Solicitar Corrida
 * **Rota:** `POST /api/v1/rides/request`
-* **Descrição:** Cria uma nova intenção de corrida. Se o serviço estiver em overflow, inicia a delegação pelo Core.
+* **Descrição:** Cria uma nova intenção de corrida. Se o serviço estiver em overflow, inicia a delegação pelo Core. Exige `ROLE_PASSENGER`.
 * **Payload de Entrada:**
 ```json
 {
@@ -79,10 +165,11 @@ Abaixo estão definidos os contratos preliminares dos endpoints HTTP que o servi
 * **Respostas:**
   * `202 Accepted` (Corrida aceita localmente ou enviada para delegação).
   * `400 Bad Request` (Parâmetros inválidos).
+  * `401 Unauthorized` (Token ausente, inválido ou expirado).
 
 #### Obter Detalhes da Corrida
 * **Rota:** `GET /api/v1/rides/{id}`
-* **Descrição:** Retorna o estado atual da corrida em tempo real.
+* **Descrição:** Retorna o estado atual da corrida em tempo real. Exige token JWT de passageiro ou motorista.
 * **Payload de Saída:**
 ```json
 {
@@ -99,7 +186,11 @@ Abaixo estão definidos os contratos preliminares dos endpoints HTTP que o servi
 
 ---
 
-### 3.2. Endpoints de Integração com o Core (Interoperabilidade)
+### 3.3. Endpoints de Integração com o Core (Protegidos por X-API-Key)
+
+> [!IMPORTANT]
+> Para garantir a segurança das integrações causal-consensuais, todos os endpoints de interoperabilidade exigem o envio da chave secreta compartilhada no cabeçalho HTTP:
+> `X-API-Key: <chave-compartilhada>`
 
 Estes endpoints são expostos para o Core acionar o serviço cliente durante os fluxos de delegação distribuída.
 

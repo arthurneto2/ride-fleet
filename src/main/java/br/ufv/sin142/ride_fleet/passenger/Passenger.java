@@ -1,5 +1,6 @@
 package br.ufv.sin142.ride_fleet.passenger;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.UUID;
@@ -11,7 +12,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString
+@ToString(exclude = "password")
 public class Passenger {
 
     @Id
@@ -26,4 +27,8 @@ public class Passenger {
 
     @Column(nullable = false)
     private String phone;
+
+    @Column(nullable = false)
+    @JsonIgnore
+    private String password;
 }
