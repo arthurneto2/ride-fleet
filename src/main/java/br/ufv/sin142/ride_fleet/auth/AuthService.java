@@ -29,7 +29,7 @@ public class AuthService {
     }
 
     @Transactional
-    public Passenger registerPassenger(PassengerRegisterDTO dto) {
+    public PassengerResponseDTO registerPassenger(PassengerRegisterDTO dto) {
         if (passengerRepository.findByEmail(dto.getEmail()).isPresent()) {
             throw new IllegalArgumentException("Email ja cadastrado para outro passageiro.");
         }
@@ -41,11 +41,17 @@ public class AuthService {
                 .password(passwordEncoder.encode(dto.getPassword()))
                 .build();
 
-        return passengerRepository.save(passenger);
+        Passenger saved = passengerRepository.save(passenger);
+        return PassengerResponseDTO.builder()
+                .id(saved.getId())
+                .name(saved.getName())
+                .email(saved.getEmail())
+                .phone(saved.getPhone())
+                .build();
     }
 
     @Transactional
-    public Driver registerDriver(DriverRegisterDTO dto) {
+    public DriverResponseDTO registerDriver(DriverRegisterDTO dto) {
         if (driverRepository.findByEmail(dto.getEmail()).isPresent()) {
             throw new IllegalArgumentException("Email ja cadastrado para outro motorista.");
         }
@@ -60,7 +66,16 @@ public class AuthService {
                 .currentLongitude(0.0)
                 .build();
 
-        return driverRepository.save(driver);
+        Driver saved = driverRepository.save(driver);
+        return DriverResponseDTO.builder()
+                .id(saved.getId())
+                .name(saved.getName())
+                .vehiclePlate(saved.getVehiclePlate())
+                .email(saved.getEmail())
+                .status(saved.getStatus())
+                .currentLatitude(saved.getCurrentLatitude())
+                .currentLongitude(saved.getCurrentLongitude())
+                .build();
     }
 
     @Transactional(readOnly = true)

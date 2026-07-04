@@ -1,7 +1,5 @@
 package br.ufv.sin142.ride_fleet.auth;
 
-import br.ufv.sin142.ride_fleet.driver.Driver;
-import br.ufv.sin142.ride_fleet.passenger.Passenger;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,15 +19,15 @@ public class AuthController {
     }
 
     @PostMapping("/passenger/register")
-    public ResponseEntity<Passenger> registerPassenger(@Valid @RequestBody PassengerRegisterDTO dto) {
-        Passenger passenger = authService.registerPassenger(dto);
-        return new ResponseEntity<>(passenger, HttpStatus.CREATED);
+    public ResponseEntity<PassengerResponseDTO> registerPassenger(@Valid @RequestBody PassengerRegisterDTO dto) {
+        PassengerResponseDTO response = authService.registerPassenger(dto);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     @PostMapping("/driver/register")
-    public ResponseEntity<Driver> registerDriver(@Valid @RequestBody DriverRegisterDTO dto) {
-        Driver driver = authService.registerDriver(dto);
-        return new ResponseEntity<>(driver, HttpStatus.CREATED);
+    public ResponseEntity<DriverResponseDTO> registerDriver(@Valid @RequestBody DriverRegisterDTO dto) {
+        DriverResponseDTO response = authService.registerDriver(dto);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     @PostMapping("/passenger/login")
