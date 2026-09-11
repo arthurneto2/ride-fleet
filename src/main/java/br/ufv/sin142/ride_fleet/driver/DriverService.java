@@ -1,6 +1,8 @@
 package br.ufv.sin142.ride_fleet.driver;
 
 import br.ufv.sin142.ride_fleet.auth.DriverRegisterDTO;
+import br.ufv.sin142.ride_fleet.driver.dto.DriverAdminUpdateDTO;
+import br.ufv.sin142.ride_fleet.driver.dto.DriverSelfUpdateDTO;
 import br.ufv.sin142.ride_fleet.ride.RideRepository;
 import br.ufv.sin142.ride_fleet.shared.exception.ConflictException;
 import br.ufv.sin142.ride_fleet.shared.exception.ResourceNotFoundException;
@@ -100,6 +102,48 @@ public class DriverService {
 
         driver.setStatus(target);
         return driverRepository.save(driver);
+    }
+
+    /** Atualizacao parcial do proprio perfil: campo nulo significa "nao alterar". */
+    @Transactional
+    public Driver updateSelf(UUID driverId, DriverSelfUpdateDTO dto) {
+        Driver driver = getById(driverId);
+
+        if (dto.getName() != null && !dto.getName().isBlank()) {
+            driver.setName(dto.getName().trim());
+        }
+        if (dto.getVehiclePlate() != null && !dto.getVehiclePlate().isBlank()) {
+            applyPlate(driver, dto.getVehiclePlate());
+        }
+        return driverRepository.save(driver);
+    }
+
+    /** Atualizacao completa pelo administrador, inclusive reativacao. */
+    @Transactional
+    public Driver adminUpdate(UUID driverId, DriverAdminUpdateDTO dto) {
+        Driver driver = getById(driverId);
+
+        driver.setName(dto.getName().trim());
+        applyPlate(driver, dto.getVehiclePlate());
+
+        String email = dto.getEmail().trim().toLowerCase();
+        if (!email.equals(driver.getEmail()) && driverRepository.existsByEmail(email)) {
+            throw new ConflictException("Email ja cadastrado para outro motorista.");
+        }
+        driver.setEmail(email);
+
+        if (dto.getActive() != null) {
+            driver.setActive(dto.getActive());
+        }
+        return driverRepository.save(driver);
+    }
+
+    private void applyPlate(Driver driver, String rawPlate) {
+        String plate = normalizePlate(rawPlate);
+        if (!plate.equals(driver.getVehiclePlate()) && driverRepository.existsByVehiclePlate(plate)) {
+            throw new ConflictException("Placa ja cadastrada para outro motorista.");
+        }
+        driver.setVehiclePlate(plate);
     }
 
     @Transactional

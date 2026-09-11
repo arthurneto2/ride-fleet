@@ -19,4 +19,7 @@ public class DriverResponseDTO {
     private DriverStatus status;
     private Double currentLatitude;
     private Double currentLongitude;
+
+    /** false quando o motorista foi excluido logicamente pelo administrador. */
+    private Boolean active;
 }

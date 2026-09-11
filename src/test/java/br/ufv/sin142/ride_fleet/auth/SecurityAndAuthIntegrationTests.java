@@ -2,6 +2,7 @@ package br.ufv.sin142.ride_fleet.auth;
 
 import br.ufv.sin142.ride_fleet.driver.DriverRepository;
 import br.ufv.sin142.ride_fleet.passenger.PassengerRepository;
+import br.ufv.sin142.ride_fleet.ride.RideRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,12 +33,20 @@ public class SecurityAndAuthIntegrationTests {
     @Autowired
     private DriverRepository driverRepository;
 
+    @Autowired
+    private RideRepository rideRepository;
+
     @BeforeEach
     public void setup() {
         this.mockMvc = MockMvcBuilders
                 .webAppContextSetup(webApplicationContext)
                 .apply(SecurityMockMvcConfigurers.springSecurity())
                 .build();
+        // As corridas vem primeiro de proposito: rides.passenger_id e
+        // rides.driver_id sao chaves estrangeiras, e @SpringBootTest compartilha o
+        // mesmo H2 entre classes de teste. Sem esta linha, uma corrida deixada por
+        // outra classe quebra este setup dependendo da ordem de execucao.
+        rideRepository.deleteAll();
         passengerRepository.deleteAll();
         driverRepository.deleteAll();
     }
