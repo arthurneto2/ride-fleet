@@ -299,10 +299,10 @@ Abaixo estão descritas as tarefas técnicas mapeadas especificamente para a sta
 
 - [x] **Configuração do Projeto:** Inicializar projeto Spring Boot (Web, JPA, Actuator, PostgreSQL/H2).
 - [x] **Modelagem do Banco de Dados:** Criar entidades JPA para `Passenger`, `Driver` e `Ride`.
-- [ ] **Máquina de Estados de Corrida:** Implementar máquina de estados da corrida (`REQUEST` -> `MATCH` -> `CONFIRM` -> `IN_TRANSIT` -> `COMPLETE`) com validações no banco de dados.
-- [ ] **Serviço de Motoristas:** Criar endpoints CRUD de motoristas e gerenciamento de status (Disponível, Em Corrida, Offline).
-- [ ] **Regra de Overflow:** Implementar lógica de detecção de overflow (ex: se o número de motoristas disponíveis for 0 ou a latência média for alta, marcar o status como congestionado).
-- [ ] **Testes de Unidade:** Desenvolver testes unitários para a máquina de estados e regra de overflow usando JUnit 5 e Mockito.
+- [x] **Máquina de Estados de Corrida:** Implementar máquina de estados da corrida (`REQUEST` -> `MATCH` -> `CONFIRM` -> `IN_TRANSIT` -> `COMPLETE`) com validações no banco de dados.
+- [x] **Serviço de Motoristas:** Criar endpoints CRUD de motoristas e gerenciamento de status (Disponível, Em Corrida, Offline).
+- [x] **Regra de Overflow:** Implementar lógica de detecção de overflow (ex: se o número de motoristas disponíveis for 0 ou a latência média for alta, marcar o status como congestionado).
+- [x] **Testes de Unidade:** Desenvolver testes unitários para a máquina de estados e regra de overflow usando JUnit 5 e Mockito.
 
 ### 🗓️ Semana 2 — Logging, Monitoramento, Fila e Load Balancer
 *Foco: Infraestrutura do microsserviço cliente.*
