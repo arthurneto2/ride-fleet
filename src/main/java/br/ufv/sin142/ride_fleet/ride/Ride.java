@@ -2,6 +2,7 @@ package br.ufv.sin142.ride_fleet.ride;
 
 import br.ufv.sin142.ride_fleet.driver.Driver;
 import br.ufv.sin142.ride_fleet.passenger.Passenger;
+import br.ufv.sin142.ride_fleet.shared.exception.InvalidRideTransitionException;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -30,8 +31,14 @@ public class Ride {
     @JoinColumn(name = "driver_id")
     private Driver driver;
 
+    /**
+     * Sem setter publico de proposito: a unica forma de mudar o estado e
+     * {@link #transitionTo(RideStatus, long)}, que valida a transicao. Assim a
+     * regra da maquina de estados e garantida pelo compilador, nao por convencao.
+     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Setter(AccessLevel.NONE)
     private RideStatus status;
 
     @Column(name = "origin_latitude", nullable = false)
@@ -69,6 +76,21 @@ public class Ride {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    /**
+     * Aplica uma transicao de estado validada pela maquina de estados e estampa o
+     * relogio logico de Lamport do evento.
+     *
+     * @throws InvalidRideTransitionException se a transicao nao for permitida a
+     *         partir do estado atual. Nesse caso a entidade nao e alterada.
+     */
+    public void transitionTo(RideStatus target, long logicalTimestamp) {
+        if (!status.canTransitionTo(target)) {
+            throw new InvalidRideTransitionException(status, target);
+        }
+        this.status = target;
+        this.logicalTimestamp = logicalTimestamp;
+    }
 
     @PrePersist
     protected void onCreate() {
