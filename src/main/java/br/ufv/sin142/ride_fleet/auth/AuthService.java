@@ -1,11 +1,14 @@
 package br.ufv.sin142.ride_fleet.auth;
 
+import br.ufv.sin142.ride_fleet.admin.Admin;
+import br.ufv.sin142.ride_fleet.admin.AdminRepository;
 import br.ufv.sin142.ride_fleet.driver.Driver;
 import br.ufv.sin142.ride_fleet.driver.DriverRepository;
-import br.ufv.sin142.ride_fleet.driver.DriverStatus;
+import br.ufv.sin142.ride_fleet.driver.DriverService;
 import br.ufv.sin142.ride_fleet.passenger.Passenger;
 import br.ufv.sin142.ride_fleet.passenger.PassengerRepository;
 import br.ufv.sin142.ride_fleet.security.JwtService;
+import br.ufv.sin142.ride_fleet.shared.exception.InvalidCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,15 +18,21 @@ public class AuthService {
 
     private final PassengerRepository passengerRepository;
     private final DriverRepository driverRepository;
+    private final AdminRepository adminRepository;
+    private final DriverService driverService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
     public AuthService(PassengerRepository passengerRepository,
                        DriverRepository driverRepository,
+                       AdminRepository adminRepository,
+                       DriverService driverService,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService) {
         this.passengerRepository = passengerRepository;
         this.driverRepository = driverRepository;
+        this.adminRepository = adminRepository;
+        this.driverService = driverService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
@@ -50,23 +59,14 @@ public class AuthService {
                 .build();
     }
 
+    /**
+     * Delega ao DriverService para que autocadastro e criacao via administrador
+     * passem pelo mesmo caminho - assim a validacao de unicidade de e-mail e placa
+     * nao pode divergir entre os dois.
+     */
     @Transactional
     public DriverResponseDTO registerDriver(DriverRegisterDTO dto) {
-        if (driverRepository.findByEmail(dto.getEmail()).isPresent()) {
-            throw new IllegalArgumentException("Email ja cadastrado para outro motorista.");
-        }
-
-        Driver driver = Driver.builder()
-                .name(dto.getName())
-                .vehiclePlate(dto.getVehiclePlate())
-                .email(dto.getEmail())
-                .password(passwordEncoder.encode(dto.getPassword()))
-                .status(DriverStatus.OFFLINE) // Status inicial offline
-                .currentLatitude(0.0)
-                .currentLongitude(0.0)
-                .build();
-
-        Driver saved = driverRepository.save(driver);
+        Driver saved = driverService.createDriver(dto);
         return DriverResponseDTO.builder()
                 .id(saved.getId())
                 .name(saved.getName())
@@ -75,23 +75,22 @@ public class AuthService {
                 .status(saved.getStatus())
                 .currentLatitude(saved.getCurrentLatitude())
                 .currentLongitude(saved.getCurrentLongitude())
+                .active(saved.getActive())
                 .build();
     }
 
     @Transactional(readOnly = true)
     public LoginResponseDTO loginPassenger(LoginRequestDTO dto) {
         Passenger passenger = passengerRepository.findByEmail(dto.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Credenciais invalidas."));
+                .orElseThrow(InvalidCredentialsException::new);
 
         if (!passwordEncoder.matches(dto.getPassword(), passenger.getPassword())) {
-            throw new IllegalArgumentException("Credenciais invalidas.");
+            throw new InvalidCredentialsException();
         }
 
-        String token = jwtService.generatePassengerToken(passenger.getId(), passenger.getEmail());
-
         return LoginResponseDTO.builder()
-                .token(token)
-                .role("ROLE_PASSENGER")
+                .token(jwtService.generatePassengerToken(passenger.getId(), passenger.getEmail()))
+                .role(JwtService.ROLE_PASSENGER)
                 .id(passenger.getId())
                 .name(passenger.getName())
                 .build();
@@ -100,19 +99,38 @@ public class AuthService {
     @Transactional(readOnly = true)
     public LoginResponseDTO loginDriver(LoginRequestDTO dto) {
         Driver driver = driverRepository.findByEmail(dto.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Credenciais invalidas."));
+                .orElseThrow(InvalidCredentialsException::new);
 
-        if (!passwordEncoder.matches(dto.getPassword(), driver.getPassword())) {
-            throw new IllegalArgumentException("Credenciais invalidas.");
+        // Motorista excluido logicamente nao entra. A mensagem e a mesma de senha
+        // errada de proposito: dizer "conta desativada" entregaria a existencia da
+        // conta a quem esta sondando.
+        if (Boolean.FALSE.equals(driver.getActive())
+                || !passwordEncoder.matches(dto.getPassword(), driver.getPassword())) {
+            throw new InvalidCredentialsException();
         }
 
-        String token = jwtService.generateDriverToken(driver.getId(), driver.getEmail());
-
         return LoginResponseDTO.builder()
-                .token(token)
-                .role("ROLE_DRIVER")
+                .token(jwtService.generateDriverToken(driver.getId(), driver.getEmail()))
+                .role(JwtService.ROLE_DRIVER)
                 .id(driver.getId())
                 .name(driver.getName())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public LoginResponseDTO loginAdmin(LoginRequestDTO dto) {
+        Admin admin = adminRepository.findByEmail(dto.getEmail())
+                .orElseThrow(InvalidCredentialsException::new);
+
+        if (!passwordEncoder.matches(dto.getPassword(), admin.getPassword())) {
+            throw new InvalidCredentialsException();
+        }
+
+        return LoginResponseDTO.builder()
+                .token(jwtService.generateAdminToken(admin.getId(), admin.getEmail()))
+                .role(JwtService.ROLE_ADMIN)
+                .id(admin.getId())
+                .name(admin.getName())
                 .build();
     }
 }

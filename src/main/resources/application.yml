@@ -48,3 +48,12 @@ ridefleet:
     # causa de uma unica requisicao de cold start
     latency-window-min-samples: 10
     latency-window-capacity: 512
+
+  # Administrador inicial. A senha fica vazia de proposito: o seed gera uma
+  # aleatoria e a registra uma vez em WARN, em vez de versionar credencial fixa.
+  # Em Docker Compose, definir ADMIN_PASSWORD por variavel de ambiente.
+  admin:
+    seed-enabled: true
+    name: Administrador RideFleet
+    email: ${ADMIN_EMAIL:admin@ridefleet.local}
+    password: ${ADMIN_PASSWORD:}

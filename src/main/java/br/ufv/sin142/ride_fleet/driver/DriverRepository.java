@@ -1,14 +1,10 @@
 package br.ufv.sin142.ride_fleet.driver;
 
-import jakarta.persistence.LockModeType;
-import jakarta.persistence.QueryHint;
-import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -49,23 +45,29 @@ public interface DriverRepository extends JpaRepository<Driver, UUID> {
     Page<Driver> findByActiveTrue(Pageable pageable);
 
     /**
-     * Seleciona e reserva candidatos para atribuicao de corrida, num unico passo.
+     * Reserva um motorista especifico, de forma atomica.
      *
-     * Emite SELECT ... FOR UPDATE SKIP LOCKED. Verificado: o H2 2.4.240 suporta
-     * SKIP LOCKED e o H2Dialect do Hibernate 7.4 habilita a opcao, entao esta
-     * unica query roda identica em PostgreSQL e nos testes.
+     * O WHERE e o lock: o banco garante que apenas uma transacao consegue mudar a
+     * linha de :expected para :to. Retorno 0 significa "outra instancia chegou
+     * primeiro" - o chamador tenta o proximo candidato.
      *
-     * Por que SKIP LOCKED e nao UPDATE condicional: a instancia B pula a linha
-     * que A travou e pega o proximo motorista na primeira tentativa. Com UPDATE
-     * condicional, B perderia e teria de tentar de novo - sob carga isso vira
-     * tempestade de retentativas exatamente na demo de load balancer.
+     * POR QUE ESTE MECANISMO E NAO SELECT ... FOR UPDATE SKIP LOCKED:
      *
-     * ATENCAO: o lock dura ate o commit. Nenhuma chamada de rede pode acontecer
-     * dentro desta transacao, sob pena de um parceiro lento segurar um lock de
-     * linha do PostgreSQL pelo timeout inteiro.
+     * O SKIP LOCKED seria teoricamente melhor (evita a retentativa), e o H2 de
+     * fato emite a clausula. Mas foi VERIFICADO experimentalmente que, com
+     * LIMIT 1, o H2 busca uma linha, descobre que esta travada, pula - e devolve
+     * vazio, em vez de avancar para a proxima linha livre como o PostgreSQL faz.
+     * Com 10 motoristas livres e 10 threads, apenas 1 conseguia atribuicao.
+     *
+     * O UPDATE condicional, alem de ser identico nos dois bancos, nao mantem lock
+     * durante a SELECAO dos candidatos, e a retentativa e barata: uma ida ao banco
+     * que falha, e o chamador ja parte para o proximo candidato da lista - nao
+     * fica todo mundo disputando a mesma linha.
      */
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))
-    @Query("select d from Driver d where d.status = :status and d.active = true order by d.id")
-    List<Driver> findAvailableForAssignment(@Param("status") DriverStatus status, Limit limit);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update Driver d set d.status = :to "
+            + "where d.id = :id and d.status = :expected and d.active = true")
+    int claimDriver(@Param("id") UUID id,
+                    @Param("expected") DriverStatus expected,
+                    @Param("to") DriverStatus to);
 }

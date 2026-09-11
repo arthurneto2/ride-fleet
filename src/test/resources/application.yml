@@ -9,3 +9,9 @@ spring:
     hibernate:
       ddl-auto: create-drop
     show-sql: false
+
+ridefleet:
+  # Nos testes cada classe cria seu proprio administrador, entao o seed fica
+  # desligado para nao deixar linha residual entre classes.
+  admin:
+    seed-enabled: false

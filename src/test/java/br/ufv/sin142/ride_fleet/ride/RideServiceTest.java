@@ -25,7 +25,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.Limit;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -35,7 +34,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -107,13 +105,27 @@ class RideServiceTest {
     }
 
     private void givenAvailableDriver(Driver driver) {
-        when(driverRepository.findAvailableForAssignment(eq(DriverStatus.AVAILABLE), any(Limit.class)))
+        when(driverRepository.findByStatusAndActiveTrue(DriverStatus.AVAILABLE))
                 .thenReturn(List.of(driver));
+        when(driverRepository.claimDriver(driver.getId(), DriverStatus.AVAILABLE, DriverStatus.IN_RIDE))
+                .thenAnswer(call -> {
+                    driver.setStatus(DriverStatus.IN_RIDE);
+                    return 1;
+                });
+        when(driverRepository.findById(driver.getId())).thenReturn(Optional.of(driver));
     }
 
     private void givenNoAvailableDriver() {
-        when(driverRepository.findAvailableForAssignment(eq(DriverStatus.AVAILABLE), any(Limit.class)))
+        when(driverRepository.findByStatusAndActiveTrue(DriverStatus.AVAILABLE))
                 .thenReturn(List.of());
+    }
+
+    /** Candidato existe na lista, mas outra instancia o reserva primeiro. */
+    private void givenDriverStolenByAnotherInstance(Driver driver) {
+        when(driverRepository.findByStatusAndActiveTrue(DriverStatus.AVAILABLE))
+                .thenReturn(List.of(driver));
+        when(driverRepository.claimDriver(driver.getId(), DriverStatus.AVAILABLE, DriverStatus.IN_RIDE))
+                .thenReturn(0);
     }
 
     private Driver availableDriver() {
@@ -205,6 +217,19 @@ class RideServiceTest {
         service.requestRide(requestDto(null), passengerCaller);
 
         verify(eventPublisher).publishEvent(any(RideOverflowedEvent.class));
+    }
+
+    @Test
+    @DisplayName("Se outra instancia reserva o motorista primeiro, a corrida aguarda no pool")
+    void shouldLeaveRideInPoolWhenDriverIsStolen() {
+        makeSavedRideVisibleForUpdate();
+        givenDriverStolenByAnotherInstance(availableDriver());
+
+        RideResponseDTO response = service.requestRide(requestDto(null), passengerCaller);
+
+        // claimDriver devolveu 0: a disputa foi perdida e nada foi atribuido
+        assertThat(response.status()).isEqualTo(RideStatus.REQUEST);
+        assertThat(response.driverId()).isNull();
     }
 
     @Test

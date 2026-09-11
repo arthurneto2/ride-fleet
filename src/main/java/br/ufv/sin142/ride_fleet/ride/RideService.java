@@ -19,7 +19,6 @@ import br.ufv.sin142.ride_fleet.shared.exception.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -136,10 +135,22 @@ public class RideService {
     /**
      * Reserva um motorista livre e move a corrida para MATCH.
      *
-     * A corrida e travada primeiro, e so depois os motoristas sao selecionados com
-     * SELECT ... FOR UPDATE SKIP LOCKED. O SKIP LOCKED garante que duas instancias
-     * peguem motoristas DIFERENTES; o lock da corrida garante que duas instancias
-     * nao processem a MESMA corrida e deixem um motorista ocupado sem corrida.
+     * Duas protecoes distintas, ambas necessarias:
+     *
+     * 1. A CORRIDA e travada primeiro (findByIdForUpdate, sem SKIP LOCKED: aqui a
+     *    segunda instancia deve ESPERAR e reavaliar). Sem isso, duas instancias
+     *    processando a MESMA corrida reservariam dois motoristas e um ficaria
+     *    ocupado sem corrida.
+     *
+     * 2. O MOTORISTA e reservado por UPDATE atomico condicional (claimDriver): o
+     *    WHERE status = AVAILABLE e o lock. Retorno 0 significa que outra instancia
+     *    chegou primeiro, e entao tentamos o proximo candidato da lista - em vez de
+     *    todos disputarem a mesma linha.
+     *
+     * A lista de candidatos e lida SEM lock, de proposito: nada fica travado
+     * durante a selecao.
+     *
+     * NENHUMA chamada de rede aqui dentro: a transacao mantem lock de linha.
      *
      * @return true se um motorista foi atribuido
      */
@@ -152,24 +163,42 @@ public class RideService {
             return false; // outra instancia ja cuidou desta corrida
         }
 
-        List<Driver> candidates =
-                driverRepository.findAvailableForAssignment(DriverStatus.AVAILABLE, Limit.of(1));
-        if (candidates.isEmpty()) {
+        Driver claimed = claimAnyAvailableDriver();
+        if (claimed == null) {
             return false;
         }
 
-        Driver driver = candidates.get(0);
-        driver.setStatus(DriverStatus.IN_RIDE);
-        driverRepository.save(driver);
-
-        ride.setDriver(driver);
+        ride.setDriver(claimed);
         ride.clearAwaitingDelegation();
         ride.transitionTo(RideStatus.MATCH, nextTimestamp(ride));
         rideRepository.save(ride);
 
         log.info("Corrida {} atribuida ao motorista {} (ts={})",
-                ride.getId(), driver.getId(), ride.getLogicalTimestamp());
+                ride.getId(), claimed.getId(), ride.getLogicalTimestamp());
         return true;
+    }
+
+    /**
+     * Percorre os motoristas livres tentando reservar um. O primeiro UPDATE
+     * condicional que afetar uma linha venceu a disputa.
+     *
+     * @return o motorista reservado, ou {@code null} se nenhum restou
+     */
+    private Driver claimAnyAvailableDriver() {
+        List<Driver> candidates = driverRepository.findByStatusAndActiveTrue(DriverStatus.AVAILABLE);
+
+        for (Driver candidate : candidates) {
+            int claimed = driverRepository.claimDriver(
+                    candidate.getId(), DriverStatus.AVAILABLE, DriverStatus.IN_RIDE);
+
+            if (claimed == 1) {
+                // claimDriver passa por fora do contexto de persistencia e o limpa,
+                // entao a entidade precisa ser relida para nao ficar desatualizada
+                return driverRepository.findById(candidate.getId()).orElseThrow(
+                        () -> new ResourceNotFoundException("Motorista", candidate.getId()));
+            }
+        }
+        return null;
     }
 
     /** Drena o pool de pendentes, usado quando um motorista fica disponivel. */

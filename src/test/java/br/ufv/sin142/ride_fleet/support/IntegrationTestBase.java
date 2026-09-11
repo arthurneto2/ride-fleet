@@ -1,5 +1,7 @@
 package br.ufv.sin142.ride_fleet.support;
 
+import br.ufv.sin142.ride_fleet.admin.Admin;
+import br.ufv.sin142.ride_fleet.admin.AdminRepository;
 import br.ufv.sin142.ride_fleet.driver.DriverRepository;
 import br.ufv.sin142.ride_fleet.passenger.PassengerRepository;
 import br.ufv.sin142.ride_fleet.ride.RideRepository;
@@ -9,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -40,6 +43,12 @@ public abstract class IntegrationTestBase {
     @Autowired
     protected PassengerRepository passengerRepository;
 
+    @Autowired
+    protected AdminRepository adminRepository;
+
+    @Autowired
+    protected PasswordEncoder passwordEncoder;
+
     protected MockMvc mockMvc;
     protected final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -53,6 +62,25 @@ public abstract class IntegrationTestBase {
         rideRepository.deleteAll();
         driverRepository.deleteAll();
         passengerRepository.deleteAll();
+        adminRepository.deleteAll();
+    }
+
+    /**
+     * Cria um administrador direto no repositorio.
+     *
+     * Nao existe endpoint publico de cadastro de admin de proposito: o unico
+     * caminho em producao e o seed inicial por configuracao.
+     */
+    protected Admin createAdmin(String email, String password) {
+        return adminRepository.save(Admin.builder()
+                .name("Administrador de Teste")
+                .email(email)
+                .password(passwordEncoder.encode(password))
+                .build());
+    }
+
+    protected String loginAdmin(String email, String password) throws Exception {
+        return tokenFrom("/api/v1/auth/admin/login", email, password);
     }
 
     protected JsonNode registerPassenger(String name, String email, String password) throws Exception {

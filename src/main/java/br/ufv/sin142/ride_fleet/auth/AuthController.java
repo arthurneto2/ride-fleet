@@ -5,9 +5,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.Map;
-
+/**
+ * Endpoints publicos de cadastro e autenticacao.
+ *
+ * O @ExceptionHandler local foi removido: ele decidia o status HTTP comparando a
+ * string da mensagem da excecao, de modo que renomear uma mensagem mudava
+ * silenciosamente o codigo de resposta. Agora InvalidCredentialsException mapeia
+ * para 401 e IllegalArgumentException para 400 no advice global - que e o codigo
+ * documentado em api_spec.md secao 3.1 para e-mail ou placa ja cadastrados.
+ */
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -20,40 +26,26 @@ public class AuthController {
 
     @PostMapping("/passenger/register")
     public ResponseEntity<PassengerResponseDTO> registerPassenger(@Valid @RequestBody PassengerRegisterDTO dto) {
-        PassengerResponseDTO response = authService.registerPassenger(dto);
-        return new ResponseEntity<>(response, HttpStatus.CREATED);
+        return new ResponseEntity<>(authService.registerPassenger(dto), HttpStatus.CREATED);
     }
 
     @PostMapping("/driver/register")
     public ResponseEntity<DriverResponseDTO> registerDriver(@Valid @RequestBody DriverRegisterDTO dto) {
-        DriverResponseDTO response = authService.registerDriver(dto);
-        return new ResponseEntity<>(response, HttpStatus.CREATED);
+        return new ResponseEntity<>(authService.registerDriver(dto), HttpStatus.CREATED);
     }
 
     @PostMapping("/passenger/login")
     public ResponseEntity<LoginResponseDTO> loginPassenger(@Valid @RequestBody LoginRequestDTO dto) {
-        LoginResponseDTO response = authService.loginPassenger(dto);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(authService.loginPassenger(dto));
     }
 
     @PostMapping("/driver/login")
     public ResponseEntity<LoginResponseDTO> loginDriver(@Valid @RequestBody LoginRequestDTO dto) {
-        LoginResponseDTO response = authService.loginDriver(dto);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(authService.loginDriver(dto));
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        Map<String, String> errorResponse = new HashMap<>();
-        String message = ex.getMessage();
-        errorResponse.put("message", message);
-
-        if ("Credenciais invalidas.".equals(message)) {
-            errorResponse.put("error", "Unauthorized");
-            return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
-        } else {
-            errorResponse.put("error", "Bad Request");
-            return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
-        }
+    @PostMapping("/admin/login")
+    public ResponseEntity<LoginResponseDTO> loginAdmin(@Valid @RequestBody LoginRequestDTO dto) {
+        return ResponseEntity.ok(authService.loginAdmin(dto));
     }
 }
