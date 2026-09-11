@@ -57,3 +57,14 @@ ridefleet:
     name: Administrador RideFleet
     email: ${ADMIN_EMAIL:admin@ridefleet.local}
     password: ${ADMIN_PASSWORD:}
+
+# Segredos. Os defaults abaixo servem apenas para desenvolvimento local e estao
+# versionados, portanto sao publicos: qualquer um que leia o repositorio pode
+# forjar um token. Em Docker Compose e na integracao da Semana 3, definir
+# JWT_SECRET e CORE_API_KEY por variavel de ambiente.
+# A chave do Core e compartilhada entre os grupos e vem da spec do Core.
+security:
+  jwt:
+    secret: ${JWT_SECRET:minhasenhasecretasupersecreta1234567890}
+  core:
+    api-key: ${CORE_API_KEY:core-shared-secret-key-123}

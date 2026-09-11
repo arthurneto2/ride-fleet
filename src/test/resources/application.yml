@@ -15,3 +15,12 @@ ridefleet:
   # desligado para nao deixar linha residual entre classes.
   admin:
     seed-enabled: false
+
+# Valores fixos de teste. Necessarios aqui porque src/test/resources/application.yml
+# substitui integralmente o arquivo principal: chave declarada so em producao nao
+# existe nos testes. SecurityAndAuthIntegrationTests depende desta chave do Core.
+security:
+  jwt:
+    secret: segredo-de-teste-com-tamanho-suficiente-1234567890
+  core:
+    api-key: core-shared-secret-key-123
