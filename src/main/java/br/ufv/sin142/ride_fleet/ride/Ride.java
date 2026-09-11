@@ -1,6 +1,7 @@
 package br.ufv.sin142.ride_fleet.ride;
 
 import br.ufv.sin142.ride_fleet.driver.Driver;
+import br.ufv.sin142.ride_fleet.overflow.OverflowReason;
 import br.ufv.sin142.ride_fleet.passenger.Passenger;
 import br.ufv.sin142.ride_fleet.shared.exception.InvalidRideTransitionException;
 import jakarta.persistence.*;
@@ -68,8 +69,39 @@ public class Ride {
     @Column(name = "delegated_to_group")
     private String delegatedToGroup;
 
+    /**
+     * Fila de saida: a corrida atingiu a politica de overflow e aguarda delegacao.
+     *
+     * Ela permanece em REQUEST no pool local de proposito. Assim, se um motorista
+     * ficar livre antes de o Core assumir, a corrida ainda e atendida localmente.
+     * A Semana 3 pluga a chamada ao Core exatamente neste ponto.
+     */
+    @Builder.Default
+    @Column(name = "awaiting_delegation", nullable = false)
+    private Boolean awaitingDelegation = false;
+
+    /** Motivo do overflow, para o log estruturado da Semana 2. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "overflow_reason")
+    private OverflowReason overflowReason;
+
+    @Column(name = "cancel_reason")
+    private String cancelReason;
+
     @Column(name = "logical_timestamp", nullable = false)
     private Long logicalTimestamp;
+
+    /**
+     * Versao para bloqueio otimista.
+     *
+     * O motorista e um recurso RESERVADO (daí o SELECT ... FOR UPDATE SKIP LOCKED
+     * na atribuicao); a corrida e um recurso EDITADO CONCORRENTEMENTE - motorista
+     * aceitando ao mesmo tempo que o passageiro cancela. Dois tipos de disputa,
+     * dois mecanismos.
+     */
+    @Version
+    @Setter(AccessLevel.NONE)
+    private Long version;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -92,12 +124,27 @@ public class Ride {
         this.logicalTimestamp = logicalTimestamp;
     }
 
+    /** Marca a corrida como aguardando delegacao, sem tira-la do pool local. */
+    public void markAwaitingDelegation(OverflowReason reason) {
+        this.awaitingDelegation = true;
+        this.overflowReason = reason;
+    }
+
+    /** Limpa a marca de delegacao pendente, quando a corrida e atendida localmente. */
+    public void clearAwaitingDelegation() {
+        this.awaitingDelegation = false;
+        this.overflowReason = null;
+    }
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
         if (logicalTimestamp == null) {
             logicalTimestamp = 0L;
+        }
+        if (awaitingDelegation == null) {
+            awaitingDelegation = false;
         }
     }
 

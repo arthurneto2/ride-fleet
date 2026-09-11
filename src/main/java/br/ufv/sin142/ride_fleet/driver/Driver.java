@@ -53,6 +53,16 @@ public class Driver {
     @Column(nullable = false)
     private Boolean active = true;
 
+    /**
+     * Versao para bloqueio otimista, como rede de seguranca: o caminho principal
+     * de reserva de motorista e o SELECT ... FOR UPDATE SKIP LOCKED, mas qualquer
+     * outra escrita concorrente na mesma linha passa a falhar de forma explicita
+     * em vez de sobrescrever silenciosamente.
+     */
+    @Version
+    @Setter(AccessLevel.NONE)
+    private Long version;
+
     @PrePersist
     protected void onCreate() {
         if (active == null) {
