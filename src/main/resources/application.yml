@@ -26,3 +26,25 @@ management:
   endpoint:
     health:
       show-details: always
+
+ridefleet:
+  # Tarifacao usada para estimar preco e ETA na criacao da corrida e nas
+  # propostas de leilao enviadas ao Core.
+  fare:
+    base-fare: 5.00
+    per-km: 2.50
+    per-minute: 0.50
+    minimum-fare: 8.00
+    average-speed-kmh: 30.0
+
+  # Politica de overflow: quando o servico se considera congestionado e deve
+  # delegar corridas. Qualquer sinal verdadeiro dispara.
+  overflow:
+    enabled: true
+    pending-rides-threshold: 5
+    average-latency-threshold-ms: 800
+    latency-window: 30s
+    # nao julga latencia com menos amostras que isso, para nao delegar por
+    # causa de uma unica requisicao de cold start
+    latency-window-min-samples: 10
+    latency-window-capacity: 512

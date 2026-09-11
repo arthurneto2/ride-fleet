@@ -41,4 +41,22 @@ public class Driver {
 
     @Column(name = "current_longitude")
     private Double currentLongitude;
+
+    /**
+     * Exclusao logica. O DELETE de motorista marca este campo como false em vez
+     * de apagar a linha, porque rides.driver_id e chave estrangeira e a auditoria
+     * causal da Semana 7 depende do historico de corridas.
+     *
+     * Consequencia: toda consulta de disponibilidade precisa filtrar active.
+     */
+    @Builder.Default
+    @Column(nullable = false)
+    private Boolean active = true;
+
+    @PrePersist
+    protected void onCreate() {
+        if (active == null) {
+            active = true;
+        }
+    }
 }

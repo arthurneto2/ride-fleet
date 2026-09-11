@@ -7,5 +7,12 @@ import java.util.UUID;
 
 @Repository
 public interface RideRepository extends JpaRepository<Ride, UUID> {
+
     List<Ride> findByStatus(RideStatus status);
+
+    /** Tamanho da fila de pendentes, usado pela politica de overflow. */
+    long countByStatus(RideStatus status);
+
+    /** Pool local de corridas pendentes, em ordem de chegada (FIFO). */
+    List<Ride> findByStatusOrderByCreatedAtAsc(RideStatus status);
 }
